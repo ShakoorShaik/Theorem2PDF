@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Math Notes Extractor</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📚 Math Notes Extractor</h1>
+            <p>Upload your math notes PDF to extract definitions, theorems, lemmas, and propositions</p>
+        </header>
+
+        <div class="upload-section">
+            <div class="upload-box" id="uploadBox">
+                <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                <p class="upload-text">Click to upload or drag and drop</p>
+                <p class="upload-subtext">PDF files only</p>
+                <input type="file" id="fileInput" accept=".pdf" hidden>
+            </div>
+
+            <div class="file-info" id="fileInfo" style="display: none;">
+                <p><strong>Selected file:</strong> <span id="fileName"></span></p>
+                <button id="processBtn" class="btn btn-primary">Extract Math Content</button>
+            </div>
+        </div>
+
+        <div class="loading" id="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p id="loadingText">Processing your PDF... This may take a minute.</p>
+            <p id="progressText" style="margin-top: 10px; color: #667eea; font-weight: 600;"></p>
+        </div>
+
+        <div class="results" id="results" style="display: none;">
+            <div class="results-header">
+                <h2>Extracted Content</h2>
+                <button id="downloadBtn" class="btn btn-success">Download PDF</button>
+            </div>
+            <div id="extractedContent" class="content-list"></div>
+        </div>
+
+        <div class="error" id="error" style="display: none;">
+            <p></p>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

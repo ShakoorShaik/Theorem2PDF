@@ -1,0 +1,273 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    padding: 20px;
+}
+
+.container {
+    max-width: 900px;
+    margin: 0 auto;
+    background: white;
+    border-radius: 16px;
+    padding: 40px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+h1 {
+    font-size: 2.5rem;
+    color: #2d3748;
+    margin-bottom: 10px;
+}
+
+header p {
+    color: #718096;
+    font-size: 1.1rem;
+}
+
+.upload-section {
+    margin-bottom: 30px;
+}
+
+.upload-box {
+    border: 3px dashed #cbd5e0;
+    border-radius: 12px;
+    padding: 60px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: #f7fafc;
+}
+
+.upload-box:hover {
+    border-color: #667eea;
+    background: #edf2f7;
+}
+
+.upload-box.dragover {
+    border-color: #667eea;
+    background: #e6f2ff;
+}
+
+.upload-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 20px;
+    color: #667eea;
+}
+
+.upload-text {
+    font-size: 1.2rem;
+    color: #2d3748;
+    margin-bottom: 8px;
+}
+
+.upload-subtext {
+    color: #a0aec0;
+}
+
+.file-info {
+    background: #f7fafc;
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.file-info p {
+    margin-bottom: 15px;
+    color: #4a5568;
+}
+
+.btn {
+    padding: 12px 32px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-primary {
+    background: #667eea;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #5568d3;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.btn-success {
+    background: #48bb78;
+    color: white;
+}
+
+.btn-success:hover {
+    background: #38a169;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(72, 187, 120, 0.4);
+}
+
+.loading {
+    text-align: center;
+    padding: 40px;
+}
+
+.spinner {
+    width: 50px;
+    height: 50px;
+    margin: 0 auto 20px;
+    border: 4px solid #e2e8f0;
+    border-top: 4px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.results {
+    margin-top: 30px;
+}
+
+.results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #e2e8f0;
+}
+
+.results-header h2 {
+    color: #2d3748;
+    font-size: 1.8rem;
+}
+
+.content-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.content-item {
+    background: #f7fafc;
+    padding: 20px;
+    border-radius: 8px;
+    border-left: 4px solid #667eea;
+}
+
+.content-item.definition {
+    border-left-color: #667eea;
+}
+
+.content-item.theorem {
+    border-left-color: #ed8936;
+}
+
+.content-item.lemma {
+    border-left-color: #48bb78;
+}
+
+.content-item.proposition {
+    border-left-color: #9f7aea;
+}
+
+.content-item.corollary {
+    border-left-color: #ed64a6;
+}
+
+.content-item.axiom {
+    border-left-color: #4299e1;
+}
+
+.content-type {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+}
+
+.content-type.definition {
+    background: #bee3f8;
+    color: #2c5282;
+}
+
+.content-type.theorem {
+    background: #feebc8;
+    color: #7c2d12;
+}
+
+.content-type.lemma {
+    background: #c6f6d5;
+    color: #22543d;
+}
+
+.content-type.proposition {
+    background: #e9d8fd;
+    color: #44337a;
+}
+
+.content-type.corollary {
+    background: #fed7e2;
+    color: #702459;
+}
+
+.content-type.axiom {
+    background: #bee3f8;
+    color: #2a4365;
+}
+
+.content-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #2d3748;
+    margin-bottom: 10px;
+}
+
+.content-text {
+    color: #4a5568;
+    line-height: 1.6;
+}
+
+.error {
+    background: #fed7d7;
+    color: #c53030;
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+    margin-top: 20px;
+}
+
+@media (max-width: 768px) {
+    .container {
+        padding: 20px;
+    }
+
+    h1 {
+        font-size: 2rem;
+    }
+
+    .results-header {
+        flex-direction: column;
+        gap: 15px;
+    }
+}
