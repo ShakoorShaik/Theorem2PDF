@@ -1,8 +1,3 @@
-/* Packed, MathJax-aware PDF generator:
-   - Extra spacing between boxes
-   - Never splits a box across pages (page breaks occur only between cards)
-*/
-
 (function () {
     class LatexPDFGenerator {
       constructor(opts = {}) {
@@ -13,13 +8,11 @@
             pdfOrientation: "p",
             filename: "extracted.pdf",
   
-            // Rendering / layout
-            rasterScale: 2.8,          // higher = sharper; adjust if files get too large
-            pageMarginPt: 28,          // ~0.39in margins
-            contentWidthPx: 820,       // layout width (px) for offscreen render
-            blockSpacingPx: 24,        // EXTRA spacing between boxes (was 12)
+            rasterScale: 2.8,
+            pageMarginPt: 28, 
+            contentWidthPx: 820,       
+            blockSpacingPx: 24,        
   
-            // Visual accents (purely cosmetic)
             colorMap: {
               definition: "#E8EDFF",
               lemma: "#E8FFF3",
@@ -40,7 +33,6 @@
   
         this.jsPDF = jsPDF;
   
-        // Off-screen render host
         this.renderHost = document.getElementById("pdfRenderContainer");
         if (!this.renderHost) {
           this.renderHost = document.createElement("div");
@@ -51,23 +43,16 @@
         }
       }
   
-      /**
-       * Public: generate a single PDF with ALL items packed together (no wasted space),
-       * extra spacing, and NO card split across pages.
-       */
       async generatePDF(items) {
         if (!Array.isArray(items) || items.length === 0) {
           throw new Error("No items to export.");
         }
   
-        // Build continuous DOM doc with all cards
         const { wrapper, cards } = await this._buildContinuousDocument(items);
   
-        // Typeset all math first
         await this._typeset(wrapper);
-        await new Promise((r) => setTimeout(r, 120)); // let layout settle
+        await new Promise((r) => setTimeout(r, 120));
   
-        // Render one big canvas of the full wrapper
         const bigCanvas = await html2canvas(wrapper, {
           backgroundColor: "#ffffff",
           scale: this.options.rasterScale,
@@ -76,20 +61,13 @@
           logging: false,
         });
   
-        // Compute page slices that BREAK ONLY BETWEEN CARDS
         const slices = this._computePageSlices(wrapper, cards, bigCanvas);
   
-        // Remove DOM wrapper
         this.renderHost.removeChild(wrapper);
   
-        // Assemble PDF using the computed slices
         await this._buildPdfFromSlices(bigCanvas, slices);
       }
   
-      /**
-       * Build one off-screen wrapper that contains ALL items stacked consecutively
-       * with extra spacing. Returns the wrapper AND a list of card DOM nodes for pagination.
-       */
       async _buildContinuousDocument(items) {
         const wrapper = document.createElement("div");
         wrapper.style.cssText = `
@@ -115,9 +93,6 @@
         return { wrapper, cards };
       }
   
-      /**
-       * Build a single “card” (box). Content inserted via textContent — no LaTeX mutation.
-       */
       _buildItemCard(item, index) {
         const type = String(item.type || "definition").toLowerCase();
         const bg = this.options.colorMap[type] || this.options.colorMap.definition;
@@ -177,13 +152,7 @@
         return card;
       }
   
-      /**
-       * Decide where page breaks should occur so that no card is split.
-       * We compute each card's top/height in DOM px, scale to canvas px,
-       * then pack cards into page slices within the available page height.
-       */
       _computePageSlices(wrapper, cards, bigCanvas) {
-        // PDF geometry (pt)
         const pdf = new this.jsPDF({
           unit: this.options.pdfUnit,
           format: this.options.pdfFormat,
@@ -194,16 +163,13 @@
         const margin = this.options.pageMarginPt;
         const usableWidthPt = pageWidthPt - 2 * margin;
         const usableHeightPt = pageHeightPt - 2 * margin;
-  
-        // Map DOM px to PDF pt via the rasterized canvas
         const pxToPt = usableWidthPt / bigCanvas.width;
         const pageSliceHeightPx = Math.floor(usableHeightPt / pxToPt);
   
-        // Build an array of card rectangles in CANVAS pixels
         const wrapperTop = wrapper.getBoundingClientRect().top;
         const cardRectsPx = cards.map((el) => {
           const r = el.getBoundingClientRect();
-          const topPx = (r.top - wrapperTop) + wrapper.scrollTop; // relative to wrapper
+          const topPx = (r.top - wrapperTop) + wrapper.scrollTop;
           const heightPx = r.height;
           return {
             topPx: Math.round(topPx * this.options.rasterScale),
@@ -211,25 +177,21 @@
           };
         });
   
-        // Pack cards into page slices:
-        // each slice is [yStartPx, yEndPx] in CANVAS pixels,
-        // and boundaries align with card bottoms so no card is cut.
         const slices = [];
-        let pageStartPx = 0;          // canvas y start for current page
-        let usedPx = 0;               // used height on current page in *PDF* usable area, but in CANVAS px
+        let pageStartPx = 0;
+        let usedPx = 0;               
         let currentIndex = 0;
   
         while (currentIndex < cardRectsPx.length) {
           usedPx = 0;
-          const pageMaxPx = pageSliceHeightPx; // capacity per page in canvas px
+          const pageMaxPx = pageSliceHeightPx;
   
           let lastCardBottomPx = pageStartPx;
           while (currentIndex < cardRectsPx.length) {
             const c = cardRectsPx[currentIndex];
             const cardTopPx = c.topPx;
             const cardBottomPx = c.topPx + c.heightPx;
-  
-            // If this is the very first card on this page, align pageStart with its top
+
             if (usedPx === 0) {
               pageStartPx = cardTopPx;
             }
@@ -237,17 +199,14 @@
             const nextUsedPx = (cardBottomPx - pageStartPx);
   
             if (nextUsedPx <= pageMaxPx) {
-              // fits on this page
               usedPx = nextUsedPx;
               lastCardBottomPx = cardBottomPx;
               currentIndex += 1;
             } else {
-              // doesn't fit; close current page BEFORE this card
               break;
             }
           }
   
-          // Push slice for this page (only if we placed at least one card)
           if (usedPx > 0) {
             slices.push({
               yStartPx: pageStartPx,
@@ -257,10 +216,8 @@
               margin,
               usableHeightPt,
             });
-            // Next page starts at lastCardBottomPx
             pageStartPx = lastCardBottomPx;
           } else {
-            // Safety: if single card is taller than a page (rare), fall back to forced slice
             const c = cardRectsPx[currentIndex];
             slices.push({
               yStartPx: c.topPx,
@@ -278,9 +235,6 @@
         return slices;
       }
   
-      /**
-       * Convert the canvas slices into PDF pages.
-       */
       async _buildPdfFromSlices(bigCanvas, slices) {
         const pdf = new this.jsPDF({
           unit: this.options.pdfUnit,
@@ -303,7 +257,6 @@
           const sliceHeightPx = yEndPx - yStartPx;
           const sliceHeightPt = sliceHeightPx * pxToPt;
   
-          // Create an image from the slice (no card is cut)
           const sliceCanvas = document.createElement("canvas");
           sliceCanvas.width = bigCanvas.width;
           sliceCanvas.height = sliceHeightPx;
@@ -354,7 +307,6 @@
       }
     }
   
-    // Expose
     window.LatexPDFGenerator = LatexPDFGenerator;
   })();
   

@@ -1,4 +1,3 @@
-// DOM Elements
 const uploadBox = document.getElementById('uploadBox');
 const fileInput = document.getElementById('fileInput');
 const fileInfo = document.getElementById('fileInfo');
@@ -14,7 +13,6 @@ const errorDiv = document.getElementById('error');
 let currentFile = null;
 let extractedData = [];
 
-// Upload UX
 uploadBox.addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
 uploadBox.addEventListener('dragover', e => { e.preventDefault(); uploadBox.classList.add('dragover'); });
@@ -59,7 +57,6 @@ processBtn.addEventListener('click', async () => {
       throw new Error('No mathematical content found in the PDF.');
     }
 
-    // 🔒 Strong client-side de-dup (same logic as server)
     extractedData = dedupeByNumberedTitle(data.content);
 
     await displayResults(extractedData);
@@ -76,8 +73,8 @@ processBtn.addEventListener('click', async () => {
 function normalizeNumberedTitle(title = '', fallbackType = '') {
   const raw = String(title || '').toLowerCase().trim()
     .replace(/\s+/g, ' ')
-    .replace(/[·–—-]/g, '-')        // normalize dashes
-    .replace(/\s*[\.:;,-]+\s*$/,''); // trim trailing punctuation
+    .replace(/[·–—-]/g, '-')
+    .replace(/\s*[\.:;,-]+\s*$/,'');
 
   const norm = raw
     .replace(/^prop\.\s+/i, 'proposition ')
@@ -136,8 +133,7 @@ async function displayResults(content) {
 
     const contentDiv = document.createElement('div');
     contentDiv.className = 'content-text';
-    contentDiv.style.whiteSpace = 'pre-wrap'; // preserve original line breaks/spaces
-    // DO NOT touch LaTeX—insert raw text, let MathJax typeset it
+    contentDiv.style.whiteSpace = 'pre-wrap';
     contentDiv.textContent = item.content || '';
 
     itemDiv.appendChild(typeSpan);
@@ -165,7 +161,6 @@ async function renderMathJax() {
   }
 }
 
-// PDF
 downloadBtn.addEventListener('click', async () => {
   try {
     showLoading('Rendering LaTeX and building the PDF...');
@@ -178,7 +173,6 @@ downloadBtn.addEventListener('click', async () => {
   }
 });
 
-// UX helpers
 function showLoading(msg = 'Loading...') {
   loadingText.textContent = msg;
   loading.style.display = 'block';
