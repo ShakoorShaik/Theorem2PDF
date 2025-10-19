@@ -1,12 +1,33 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Math Notes Extractor</title>
-    <link rel="stylesheet" href="styles.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-</head>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Math Notes Extractor</title>
+      
+        <!-- Correct file name: style.css (not styles.css) -->
+        <link rel="stylesheet" href="style.css" />
+      
+        <!-- jsPDF and html2canvas -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+      
+        <!-- MathJax config MUST come before MathJax script -->
+        <script>
+          window.MathJax = {
+            tex: {
+              inlineMath: [['$', '$'], ['\\(', '\\)']],
+              displayMath: [['$$','$$'], ['\\[','\\]']],
+              processEscapes: true,
+              packages: {'[+]': ['noerrors', 'noundefined']}
+            },
+            svg: { fontCache: 'global' },
+            options: { renderActions: { addMenu: [] } }
+          };
+        </script>
+        <!-- MathJax (SVG output for crisp symbols in PDF) -->
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.js"></script>
+      </head>
 <body>
     <div class="container">
         <header>
@@ -41,7 +62,7 @@
         <div class="results" id="results" style="display: none;">
             <div class="results-header">
                 <h2>Extracted Content</h2>
-                <button id="downloadBtn" class="btn btn-success">Download PDF</button>
+                <button id="downloadBtn" class="btn btn-success">Download Formatted PDF</button>
             </div>
             <div id="extractedContent" class="content-list"></div>
         </div>
@@ -50,7 +71,10 @@
             <p></p>
         </div>
     </div>
+    <div id="pdfRenderContainer" style="position: absolute; left: -9999px; top: 0; width: 210mm; background: white;"></div>
 
+    <!-- Load the MathJax-aware PDF generator BEFORE app.js -->
+    <script src="pdf-generator.js"></script>
     <script src="app.js"></script>
 </body>
 </html>

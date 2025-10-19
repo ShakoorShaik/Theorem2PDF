@@ -9,205 +9,182 @@ require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
 
+// Initialize OpenAI
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// Middleware
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public'));
+
+// ✅ Serve static files from ./public
+const PUBLIC_DIR = path.join(__dirname, 'public');
+app.use(express.static(PUBLIC_DIR));
+
+// Root -> public/index.html
+app.get('/', (_req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
+});
+
+// Multer upload setup
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const uploadDir = 'uploads';
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir);
-    }
+    const uploadDir = path.join(__dirname, 'uploads');
+    if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir);
     cb(null, uploadDir);
   },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + '-' + file.originalname);
-  }
+  filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname)
 });
 
-const upload = multer({ 
-  storage: storage,
+const upload = multer({
+  storage,
   fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'application/pdf') {
-      cb(null, true);
-    } else {
-      cb(new Error('Only PDF files are allowed'));
-    }
+    if (file.mimetype === 'application/pdf') cb(null, true);
+    else cb(new Error('Only PDF files are allowed'));
   }
 });
 
-app.post('/api/extract', upload.single('pdf'), async (req, res) => {
-  try {
-    console.log('Received file upload request');
-    
-    if (!req.file) {
-      console.log('No file in request');
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
+// ---------- Helpers ----------
 
-    console.log('File received:', req.file.originalname);
-    const filePath = req.file.path;
-    
-    console.log('Parsing PDF...');
-    const dataBuffer = fs.readFileSync(filePath);
-    const pdfData = await pdfParse(dataBuffer);
-    const pdfText = pdfData.text;
-    const pageCount = pdfData.numpages;
-    console.log(`PDF parsed - Pages: ${pageCount}, Text length: ${pdfText.length} characters`);
-    fs.unlinkSync(filePath);
-    if (!process.env.OPENAI_API_KEY || process.env.OPENAI_API_KEY === 'your_openai_api_key_here') {
-      console.error('OpenAI API key not set!');
-      return res.status(500).json({ 
-        error: 'Server configuration error: OpenAI API key not set. Please check the .env file.' 
-      });
-    }
-
-    console.log('Calling OpenAI API for extraction...');
-    const extracted = await extractMathContent(pdfText);
-    console.log('Extraction complete, found', extracted.length, 'items');
-
-    res.json({ 
-      success: true, 
-      content: extracted,
-      stats: {
-        totalPages: pageCount,
-        totalItems: extracted.length
-      }
-    });
-
-  } catch (error) {
-    console.error('Error processing PDF:', error);
-    res.status(500).json({ 
-      error: 'Failed to process PDF', 
-      details: error.message 
-    });
-  }
-});
-
+// Split big text for LLM
 function chunkText(text, chunkSize = 15000) {
   const chunks = [];
-  for (let i = 0; i < text.length; i += chunkSize) {
-    chunks.push(text.substring(i, i + chunkSize));
-  }
+  for (let i = 0; i < text.length; i += chunkSize) chunks.push(text.substring(i, i + chunkSize));
   return chunks;
 }
 
-async function extractMathContent(text) {
+/**
+ * Normalize a math-item title to a canonical numbered key.
+ * Handles variants like:
+ *  - "Proposition 1.2.3 (Archimedean Property)"
+ *  - "prop. 1.2.3"
+ *  - "PROPOSITION 1.2.3."
+ *  -> "proposition 1.2.3"
+ */
+function normalizeNumberedTitle(title = '', fallbackType = '') {
+  const raw = String(title || '').toLowerCase().trim()
+    .replace(/\s+/g, ' ')
+    .replace(/[·–—-]/g, '-')        // normalize dashes
+    .replace(/\s*[\.:;,-]+\s*$/,''); // trim trailing punctuation
+
+  // Map common abbreviations to full forms
+  const norm = raw
+    .replace(/^prop\.\s+/i, 'proposition ')
+    .replace(/^cor\.\s+/i, 'corollary ');
+
+  // Match leading Keyword + number chain
+  const re = /^(definition|theorem|lemma|proposition|corollary|axiom|prop\.?|cor\.?)\s+(\d+(?:\.\d+)*)/i;
+  const m = norm.match(re);
+  if (m) {
+    // Expand any abbreviation in capture
+    const head = m[1].replace(/^prop\.?$/i, 'proposition').replace(/^cor\.?$/i, 'corollary').toLowerCase();
+    return `${head} ${m[2]}`; // e.g., "proposition 1.2.3"
+  }
+
+  // Fallback: if no leading keyword+number, try to recover just the number after fallback type
+  const m2 = norm.match(/\b(\d+(?:\.\d+)*)\b/);
+  if (m2 && fallbackType) {
+    return `${String(fallbackType).toLowerCase().trim()} ${m2[1]}`;
+  }
+  return norm || (fallbackType ? String(fallbackType).toLowerCase().trim() : '');
+}
+
+/**
+ * Strong de-duplication:
+ *  - Group strictly by normalized numbered title key (ignores subtitles/punctuation/casing)
+ *  - Keep the version with the longest non-empty content
+ *  - If tie, keep the first seen
+ */
+function dedupeByNumberedTitle(items) {
+  const best = new Map(); // key -> item
+  for (const it of items) {
+    const key = normalizeNumberedTitle(it.title, it.type);
+    const existing = best.get(key);
+    if (!existing) {
+      best.set(key, it);
+    } else {
+      const currLen = (it.content || '').length;
+      const prevLen = (existing.content || '').length;
+      if (currLen > prevLen) best.set(key, it);
+    }
+  }
+  return Array.from(best.values());
+}
+
+// LLM extraction
+async function extractMathContent(pdfText) {
+  const chunks = chunkText(pdfText, 15000);
+  let all = [];
+
+  for (let i = 0; i < chunks.length; i++) {
+    const prompt = `You are an expert at extracting mathematical content from academic notes.
+
+Extract ALL unique Definitions, Theorems, Lemmas, Propositions, Corollaries, and Axioms.
+
+RULES:
+- Preserve LaTeX EXACTLY (backslashes, $, $$, \\begin{env} ... \\end{env}, etc.).
+- Keep the author’s numbering and titles exactly.
+- Do NOT add, remove, or rewrite any math.
+- No proofs/examples, only the statements.
+- Return JSON with an "items" array of objects: {type,title,content,page}.
+
+Text (chunk ${i + 1}/${chunks.length}):
+"""${chunks[i]}"""`;
+
+    const resp = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      temperature: 0.1,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: 'Extract unique math statements and preserve LaTeX exactly.' },
+        { role: 'user', content: prompt }
+      ]
+    });
+
+    let chunkItems = [];
+    try {
+      const parsed = JSON.parse(resp.choices?.[0]?.message?.content || '{}');
+      if (Array.isArray(parsed.items)) chunkItems = parsed.items;
+      else if (Array.isArray(parsed)) chunkItems = parsed;
+    } catch (_) { /* ignore bad chunk */ }
+
+    all = all.concat(chunkItems);
+    if (i < chunks.length - 1) await new Promise(r => setTimeout(r, 400));
+  }
+
+  // 🔒 strong, title-number based de-dup
+  return dedupeByNumberedTitle(all);
+}
+
+// ---------- Routes ----------
+
+app.post('/api/extract', upload.single('pdf'), async (req, res) => {
   try {
-    const chunks = chunkText(text, 15000);
-    console.log(`Processing ${chunks.length} chunks...`);
-    
-    let allExtractions = [];
-    
-    for (let i = 0; i < chunks.length; i++) {
-      console.log(`Processing chunk ${i + 1}/${chunks.length}...`);
-      
-      const prompt = `You are an expert at extracting mathematical content from academic notes. 
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
-Analyze the following text and extract ALL definitions, theorems, lemmas, propositions, corollaries, and axioms.
+    const data = fs.readFileSync(req.file.path);
+    const parsed = await pdfParse(data);
+    fs.unlinkSync(req.file.path);
 
-For each item you find:
-1. Identify its type (Definition, Theorem, Lemma, Proposition, Corollary, or Axiom)
-2. Extract the complete statement
-3. Include any numbering or labeling if present
-4. Preserve mathematical notation as closely as possible
-
-Format your response as a JSON object with an "items" array:
-{
-  "items": [
-    {
-      "type": "Definition",
-      "title": "Definition 1.2 (Optional Name)",
-      "content": "The complete definition text..."
-    },
-    {
-      "type": "Theorem",
-      "title": "Theorem 3.1 (Pythagorean Theorem)",
-      "content": "The complete theorem statement..."
+    if (!process.env.OPENAI_API_KEY) {
+      return res.status(500).json({ error: 'OpenAI API key not set on server.' });
     }
-  ]
-}
 
-Only include actual mathematical statements, not examples or explanations.
-
-Text to analyze:
-${chunks[i]}`;
-
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          { 
-            role: 'system', 
-            content: 'You are a mathematical content extraction assistant. Always respond with valid JSON.' 
-          },
-          { role: 'user', content: prompt }
-        ],
-        temperature: 0.3,
-        response_format: { type: "json_object" }
-      });
-
-      const result = JSON.parse(response.choices[0].message.content);
-      
-      let chunkItems = [];
-      if (result.items && Array.isArray(result.items)) {
-        chunkItems = result.items;
-      } else if (Array.isArray(result)) {
-        chunkItems = result;
-      } else if (result.extractions) {
-        chunkItems = result.extractions;
-      } else {
-        const firstKey = Object.keys(result)[0];
-        if (Array.isArray(result[firstKey])) {
-          chunkItems = result[firstKey];
-        }
-      }
-      
-      console.log(`Found ${chunkItems.length} items in chunk ${i + 1}`);
-      allExtractions = allExtractions.concat(chunkItems);
-      
-      if (i < chunks.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-    }
-    
-    console.log(`Total items extracted: ${allExtractions.length}`);
-    
-    const uniqueExtractions = removeDuplicates(allExtractions);
-    console.log(`After removing duplicates: ${uniqueExtractions.length}`);
-    
-    return uniqueExtractions;
-
-  } catch (error) {
-    console.error('Error extracting math content:', error);
-    throw new Error('Failed to extract mathematical content: ' + error.message);
+    const items = await extractMathContent(parsed.text);
+    return res.json({
+      success: true,
+      content: items,
+      stats: { totalPages: parsed.numpages, totalItems: items.length }
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to process PDF', details: err.message });
   }
-}
-
-function removeDuplicates(items) {
-  const seen = new Set();
-  const unique = [];
-  
-  for (const item of items) {
-    const key = item.content.substring(0, 100).toLowerCase().trim();
-    
-    if (!seen.has(key)) {
-      seen.add(key);
-      unique.push(item);
-    }
-  }
-  
-  return unique;
-}
-
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok' });
 });
+
+app.get('/api/health', (_req, res) => res.json({ status: 'ok' }));
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
-  console.log(`Make sure your OpenAI API key is set in the .env file`);
+  console.log(`Serving static files from: ${PUBLIC_DIR}`);
 });
